@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Probador Virtual de Corbatas Neón | Proyecto LEM</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Three.js (3D Engine) y GLTFLoader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+  <!-- MediaPipe Pose (Detección de Hombros y Cuello en Tiempo Real) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- Barra de Navegación Superior -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="logo-icon">👔</div>
+      <div>
+        <h1 class="logo-title">VirtualTie <span class="neon-badge">NEÓN AR</span></h1>
+        <p class="logo-sub">Legislación Empresarial | Probador y Modelaje Virtual 3D</p>
+      </div>
+    </div>
+
+    <div class="system-status">
+      <div id="status-pill" class="status-pill status-loading">
+        <span class="status-dot"></span>
+        <span id="status-text">Iniciando sistema...</span>
+      </div>
+      <div class="fps-counter" id="fps-display">-- FPS</div>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <main class="app-layout">
+    
+    <!-- Zona del Probador en Tiempo Real -->
+    <section class="viewer-section">
+      <div class="camera-container" id="camera-container">
+        <!-- Video de la cámara web -->
+        <video id="webcam" playsinline muted autoplay></video>
+        
+        <!-- Canvas para superponer el modelo 3D -->
+        <canvas id="three-canvas"></canvas>
+
+        <!-- Canvas auxiliar para dibujar puntos de seguimiento opcionales -->
+        <canvas id="debug-canvas"></canvas>
+
+        <!-- Pantalla de carga / aviso de inicio -->
+        <div id="loader-screen" class="loader-screen">
+          <div class="neon-spinner"></div>
+          <h2 id="loader-title">Preparando Probador Virtual</h2>
+          <p id="loader-desc">Solicitando acceso a la cámara y cargando modelos 3D...</p>
+        </div>
+
+        <!-- Indicador de detección -->
+        <div id="detection-guide" class="detection-guide">
+          <span class="guide-icon">🎯</span>
+          <span id="guide-text">Ubícate frente a la cámara mostrando cuello y hombros</span>
+        </div>
+
+        <!-- Flash al tomar foto -->
+        <div id="flash-effect" class="flash-effect"></div>
+      </div>
+
+      <!-- Barra de acciones rápidas sobre el visor -->
+      <div class="viewer-controls">
+        <button id="btn-toggle-cam" class="tool-btn active" title="Encender o pausar cámara">
+          <span class="icon">📷</span> <span class="label">Cámara Activa</span>
+        </button>
+        <button id="btn-toggle-mirror" class="tool-btn active" title="Alternar modo espejo">
+          <span class="icon">🪞</span> <span class="label">Modo Espejo</span>
+        </button>
+        <button id="btn-toggle-flip" class="tool-btn" title="Invertir orientación vertical de la corbata">
+          <span class="icon">↕️</span> <span class="label">Girar Vertical</span>
+        </button>
+        <button id="btn-toggle-landmarks" class="tool-btn" title="Mostrar puntos de detección">
+          <span class="icon">📐</span> <span class="label">Ver Puntos AR</span>
+        </button>
+        <button id="btn-take-photo" class="tool-btn capture-btn" title="Tomar foto con la corbata">
+          <span class="icon">📸</span> <span class="label">Tomar Foto</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Panel Lateral: Catálogo y Calibración -->
+    <aside class="panel-section">
+      
+      <!-- Selector de Modelos -->
+      <div class="card catalog-card">
+        <div class="card-header">
+          <h2>Catálogo de Modelos</h2>
+          <span class="badge">3 Diseños Neón</span>
+        </div>
+        <p class="card-desc">Haz clic en la corbata que deseas probarte:</p>
+
+        <div class="tie-grid">
+          
+          <div class="tie-item active" data-index="1" data-path="models/corbata_neon1.glb">
+            <div class="thumb-box">
+              <img src="assets/thumb1.jpg" alt="Corbata Neón 1" class="thumb-img" onerror="this.src=''; this.alt='👔 Modelo 1';">
+              <span class="neon-tag tag-cyan">Neón C-1</span>
+            </div>
+            <div class="tie-details">
+              <h3>Corbata Neón Clásica</h3>
+              <p>Diseño corporativo con fibra luminiscente</p>
+            </div>
+            <div class="radio-check"></div>
+          </div>
+
+          <div class="tie-item" data-index="2" data-path="models/corbata_neon2.glb">
+            <div class="thumb-box">
+              <img src="assets/thumb2.jpg" alt="Corbata Neón 2" class="thumb-img" onerror="this.src=''; this.alt='👔 Modelo 2';">
+              <span class="neon-tag tag-gold">Neón C-2</span>
+            </div>
+            <div class="tie-details">
+              <h3>Corbata Neón Moderna</h3>
+              <p>Línea vanguardista de alta costura tech</p>
+            </div>
+            <div class="radio-check"></div>
+          </div>
+
+          <div class="tie-item" data-index="3" data-path="models/corbata_neon3.glb">
+            <div class="thumb-box">
+              <img src="assets/thumb3.jpg" alt="Corbata Neón 3" class="thumb-img" onerror="this.src=''; this.alt='👔 Modelo 3';">
+              <span class="neon-tag tag-magenta">Neón C-3</span>
+            </div>
+            <div class="tie-details">
+              <h3>Corbata Neón Élite</h3>
+              <p>Edición premium de gala luminosa</p>
+            </div>
+            <div class="radio-check"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Opciones de Personalización Neón -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Efecto de Luz Neón</h2>
+          <span class="badge-mini">Personalizable</span>
+        </div>
+
+        <div class="option-row">
+          <label>Color del Neón:</label>
+          <div class="color-palette">
+            <button class="color-swatch active" style="--c: #00f0ff;" data-color="#00f0ff" title="Cyan Neón"></button>
+            <button class="color-swatch" style="--c: #39ff14;" data-color="#39ff14" title="Verde Neón"></button>
+            <button class="color-swatch" style="--c: #ff007f;" data-color="#ff007f" title="Rosa Neón"></button>
+            <button class="color-swatch" style="--c: #ffd700;" data-color="#ffd700" title="Dorado Neón"></button>
+            <button class="color-swatch" style="--c: #bf00ff;" data-color="#bf00ff" title="Púrpura Eléctrico"></button>
+            <button class="color-swatch" style="--c: #ffffff;" data-color="#ffffff" title="Blanco Hielo"></button>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Intensidad del Brillo</span>
+            <span id="glow-val">2.5x</span>
+          </div>
+          <input type="range" id="slider-glow" min="0.5" max="5.0" step="0.2" value="2.5">
+        </div>
+
+        <div class="checkbox-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-shirt">
+            <span class="switch-slider"></span>
+          </label>
+          <span class="toggle-label">Mostrar camisa 3D acompañante</span>
+        </div>
+      </div>
+
+      <!-- Calibración y Ajuste Fino -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Ajuste de Calce y Talla</h2>
+          <button id="btn-reset-calibration" class="text-btn">Restablecer</button>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Escala / Grosor</span>
+            <span id="scale-val">100%</span>
+          </div>
+          <input type="range" id="slider-scale" min="0.5" max="2.5" step="0.05" value="1.0">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Posición Vertical (Altura del Nudo)</span>
+            <span id="y-val">0 cm</span>
+          </div>
+          <input type="range" id="slider-y" min="-25" max="25" step="0.5" value="0">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Profundidad (Adelante / Atrás)</span>
+            <span id="z-val">0 cm</span>
+          </div>
+          <input type="range" id="slider-z" min="-15" max="15" step="0.5" value="0">
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Modal de Foto Capturada -->
+  <div id="photo-modal" class="modal-backdrop">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Tu Prueba de Corbata Neón</h3>
+        <button id="btn-close-modal" class="close-x">&times;</button>
+      </div>
+      <div class="modal-content">
+        <img id="photo-preview-img" src="" alt="Captura de prueba">
+      </div>
+      <div class="modal-footer">
+        <a id="btn-download-photo" class="btn-download" download="prueba-corbata-neon.png">Descargar Imagen</a>
+        <button id="btn-discard-photo" class="btn-dismiss">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
